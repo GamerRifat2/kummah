@@ -76,11 +76,16 @@
 
         /* Print Styles */
         @media print {
+            @page {
+                size: A4;
+                margin: 0.5cm;
+            }
             body {
                 margin: 0;
                 padding: 0;
                 background-color: white;
                 -webkit-print-color-adjust: exact;
+                zoom: 0.95; /* Slight scale down to ensure fit */
             }
             .invoice-container {
                 box-shadow: none;
@@ -88,7 +93,7 @@
                 max-width: 100%;
                 width: 100%;
                 margin: 0;
-                padding: 10px;
+                padding: 0;
             }
             .controls, .paid-toggle-container, #add-item-btn, .delete-row {
                 display: none !important;
@@ -96,6 +101,20 @@
             .editable {
                 border-bottom: none;
             }
+            /* Compact spacing for print to fit one page */
+            header {
+                padding-bottom: 10px !important;
+            }
+            .mt-6, .mt-8, .mt-12 {
+                margin-top: 1rem !important;
+            }
+            .mb-6, .mb-8 {
+                margin-bottom: 1rem !important;
+            }
+            .p-4 {
+                padding: 0.75rem !important;
+            }
+            
             /* Ensure background colors print */
             * {
                 -webkit-print-color-adjust: exact !important;
@@ -105,6 +124,52 @@
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+
+    <!-- Controls (Search & Actions) -->
+    <div class="controls max-w-[850px] mx-auto mt-6 mb-2 px-4 print:hidden">
+        <!-- Search Section -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+            <h3 class="text-sm font-bold text-gray-500 uppercase mb-2">Invoice Memory / ذاكرة الفواتير</h3>
+            <div class="flex gap-2">
+                <input type="number" id="search-input" placeholder="Enter Invoice No / أدخل رقم الفاتورة" class="flex-grow p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <button onclick="searchInvoice()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors">Search / بحث</button>
+            </div>
+            <p id="search-message" class="text-xs mt-2 font-medium"></p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap gap-3 justify-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+             <button onclick="generateNewInvoice()" class="flex-1 bg-gray-600 text-white px-4 py-3 rounded-lg hover:bg-gray-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
+                New Invoice / فاتورة جديدة
+            </button>
+            <button onclick="saveInvoice()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
+                Save / حفظ
+            </button>
+            <button onclick="window.print()" class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-bold shadow transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print / طباعة
+            </button>
+        </div>
+        
+        <div class="mt-4 flex flex-col md:flex-row justify-between items-center gap-3">
+             <div class="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 flex items-center gap-2">
+                <label for="paid-toggle" class="font-medium text-gray-700 cursor-pointer select-none text-sm">Mark as PAID / مدفوع</label>
+                <input type="checkbox" id="paid-toggle" class="h-5 w-5 rounded text-green-600 focus:ring-green-500 cursor-pointer">
+            </div>
+
+            <!-- Data Backup Controls -->
+            <div class="flex gap-2 text-xs text-gray-500">
+                <button onclick="backupData()" class="hover:text-blue-600 underline">Backup Data / نسخ احتياطي</button>
+                <span>|</span>
+                <label class="hover:text-blue-600 underline cursor-pointer">
+                    Restore Data / استعادة
+                    <input type="file" class="hidden" onchange="restoreData(this)" accept=".json">
+                </label>
+            </div>
+        </div>
+    </div>
 
     <div class="invoice-container relative overflow-hidden" id="invoice">
         <!-- PAID Bilingual Seal -->
@@ -234,6 +299,10 @@
                     <p>
                         <strong class="text-xs">Email:</strong> <span contenteditable="true" class="editable">zobayerbhuiyan2@gmail.com</span>
                     </p>
+                    <p class="flex items-center gap-1">
+                        <img src="whatsapp.png" alt="WhatsApp" class="w-4 h-4 object-contain">
+                        <strong class="text-xs">WhatsApp:</strong> <span contenteditable="true" class="editable">93526874</span>
+                    </p>
                  </div>
 
                  <!-- QR Code Placeholder -->
@@ -251,47 +320,43 @@
         </footer>
     </div>
 
-    <!-- Controls -->
-    <div class="controls max-w-800px mx-auto my-6 text-center space-y-4 print:hidden">
-        <div class="bg-white p-4 rounded-lg shadow-sm border inline-block">
-            <div class="paid-toggle-container flex justify-center items-center gap-3">
-                <label for="paid-toggle" class="font-medium text-gray-700 cursor-pointer select-none">Mark as PAID / مدفوع</label>
-                <input type="checkbox" id="paid-toggle" class="h-5 w-5 rounded text-green-600 focus:ring-green-500 cursor-pointer">
-            </div>
-        </div>
-        
-        <div>
-            <button onclick="window.print()" class="px-8 py-3 bg-green-600 text-white font-bold rounded-lg shadow-lg hover:bg-green-700 hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print / Save as PDF
-            </button>
-        </div>
-    </div>
-
     <script>
         // --- 1. Invoice Number Logic ---
         const invoiceNumberElement = document.getElementById('invoice-number');
+        const STORAGE_PREFIX = 'zobayer_inv_';
+        const STORAGE_KEY_COUNTER = 'zobayerKummahInvoiceNum';
+
+        function getCurrentInvoiceNumber() {
+            let num = localStorage.getItem(STORAGE_KEY_COUNTER);
+            if (!num) return 1000;
+            return parseInt(num, 10);
+        }
+
+        function setInvoiceNumberDisplay(num) {
+            invoiceNumberElement.textContent = String(num).padStart(6, '0');
+        }
         
         function initializeInvoiceNumber() {
-            const STORAGE_KEY = 'zobayerKummahInvoiceNum';
-            let lastInvoiceNumber = localStorage.getItem(STORAGE_KEY);
-
+            let lastInvoiceNumber = localStorage.getItem(STORAGE_KEY_COUNTER);
             if (!lastInvoiceNumber) {
                 lastInvoiceNumber = 1000;
+                localStorage.setItem(STORAGE_KEY_COUNTER, lastInvoiceNumber);
             }
-
-            let currentInvoiceNumber = parseInt(lastInvoiceNumber, 10) + 1;
-            invoiceNumberElement.textContent = String(currentInvoiceNumber).padStart(6, '0');
-            localStorage.setItem(STORAGE_KEY, currentInvoiceNumber);
+            // For a new session, we assume we are working on the NEXT number
+            // But we don't increment until we hit "New Invoice" or first load if user wants
+            // For simplicity, let's load the *next* available number
+            let current = parseInt(lastInvoiceNumber, 10) + 1;
+            setInvoiceNumberDisplay(current);
         }
 
         // --- 2. Date Logic ---
         const dateElement = document.getElementById('invoice-date');
-        const today = new Date();
-        const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-        dateElement.textContent = formattedDate;
+        
+        function setTodayDate() {
+            const today = new Date();
+            const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+            dateElement.textContent = formattedDate;
+        }
 
         // --- 3. Calculation Logic ---
         const itemsTableBody = document.getElementById('items-table-body');
@@ -312,17 +377,17 @@
         };
 
         // --- 4. Table Interactions ---
-        const addRow = () => {
+        const addRow = (desc = "Omani Kummah (Hand Made)", price = "0.000") => {
             const newRow = document.createElement('tr');
             newRow.className = 'item-row border-b border-gray-100 hover:bg-gray-50';
             newRow.innerHTML = `
                 <td class="p-3 align-top">
                     <div class="flex flex-col gap-1">
-                        <span contenteditable="true" class="item-desc editable w-full block font-medium text-gray-800" data-placeholder="Description">Omani Kummah (Hand Made)</span>
+                        <span contenteditable="true" class="item-desc editable w-full block font-medium text-gray-800" data-placeholder="Description">${desc}</span>
                     </div>
                 </td>
                 <td class="p-3 align-top text-right">
-                    <span contenteditable="true" class="item-amount editable w-full block text-right font-mono text-lg">0.000</span>
+                    <span contenteditable="true" class="item-amount editable w-full block text-right font-mono text-lg">${price}</span>
                 </td>
                 <td class="p-3 text-center print:hidden align-middle">
                     <button onclick="deleteRow(this)" class="delete-row text-red-400 hover:text-red-600 font-bold p-1 rounded hover:bg-red-50">&times;</button>
@@ -360,12 +425,12 @@
         };
         
         // --- 5. Initialization ---
-        addItemBtn.addEventListener('click', addRow);
+        addItemBtn.addEventListener('click', () => addRow());
         
-        // Add one initial row
-        addRow();
-        
+        // Start fresh
+        setTodayDate();
         initializeInvoiceNumber();
+        addRow(); // Initial row
         calculateTotal();
 
         const paidToggle = document.getElementById('paid-toggle');
@@ -375,7 +440,6 @@
         });
 
         // --- 6. Auto-clear Placeholders ---
-        // This function removes the default text when you click/focus on the field
         const setupAutoClear = (elementId, defaultText) => {
             const el = document.getElementById(elementId);
             if (!el) return;
@@ -393,9 +457,156 @@
             });
         };
 
-        // Apply to Customer Name and Phone
         setupAutoClear('customer-name', 'Customer Name');
         setupAutoClear('customer-phone', 'Phone Number');
+
+        // --- 7. Memory Functions (Save/Search/New) ---
+
+        function saveInvoice() {
+            const invoiceNum = invoiceNumberElement.textContent;
+            const customerName = document.getElementById('customer-name').innerText;
+            const customerPhone = document.getElementById('customer-phone').innerText;
+            const date = document.getElementById('invoice-date').innerText;
+            const paid = document.getElementById('paid-toggle').checked;
+
+            // Gather items
+            const items = [];
+            document.querySelectorAll('.item-row').forEach(row => {
+                const desc = row.querySelector('.item-desc').innerText;
+                const amount = row.querySelector('.item-amount').innerText;
+                items.push({ desc, amount });
+            });
+
+            const invoiceData = {
+                id: invoiceNum,
+                customerName,
+                customerPhone,
+                date,
+                items,
+                paid
+            };
+
+            // Save specific invoice data
+            localStorage.setItem(STORAGE_PREFIX + parseInt(invoiceNum, 10), JSON.stringify(invoiceData));
+            
+            // Show feedback
+            const msg = document.getElementById('search-message');
+            msg.textContent = `Invoice #${invoiceNum} Saved Successfully! / تم الحفظ بنجاح`;
+            msg.className = "text-xs mt-2 font-bold text-green-600";
+            setTimeout(() => msg.textContent = "", 3000);
+        }
+
+        function searchInvoice() {
+            const searchInput = document.getElementById('search-input');
+            const searchVal = searchInput.value;
+            const msg = document.getElementById('search-message');
+
+            if (!searchVal) {
+                msg.textContent = "Please enter a number / الرجاء إدخال رقم";
+                msg.className = "text-xs mt-2 font-bold text-red-500";
+                return;
+            }
+
+            const dataString = localStorage.getItem(STORAGE_PREFIX + parseInt(searchVal, 10));
+            
+            if (dataString) {
+                const data = JSON.parse(dataString);
+                
+                // Populate fields
+                invoiceNumberElement.textContent = String(data.id).padStart(6, '0');
+                document.getElementById('customer-name').innerText = data.customerName;
+                document.getElementById('customer-phone').innerText = data.customerPhone;
+                document.getElementById('invoice-date').innerText = data.date;
+                
+                // Paid status
+                document.getElementById('paid-toggle').checked = data.paid || false;
+                watermark.style.display = data.paid ? 'block' : 'none';
+
+                // Rebuild items
+                itemsTableBody.innerHTML = ''; // Clear current
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(item => {
+                        addRow(item.desc, item.amount);
+                    });
+                } else {
+                    addRow(); // Default empty row if none found
+                }
+                
+                calculateTotal();
+
+                msg.textContent = `Invoice #${searchVal} Loaded / تم التحميل`;
+                msg.className = "text-xs mt-2 font-bold text-blue-600";
+            } else {
+                msg.textContent = `Invoice #${searchVal} Not Found / غير موجود`;
+                msg.className = "text-xs mt-2 font-bold text-red-500";
+            }
+        }
+
+        function generateNewInvoice() {
+            // Get current highest number from storage to ensure we step forward
+            let lastInvoiceNumber = localStorage.getItem(STORAGE_KEY_COUNTER);
+            if (!lastInvoiceNumber) lastInvoiceNumber = 1000;
+            
+            // Increment
+            const nextNum = parseInt(lastInvoiceNumber, 10) + 1;
+            
+            // Save new counter
+            localStorage.setItem(STORAGE_KEY_COUNTER, nextNum);
+            
+            // Update Display
+            setInvoiceNumberDisplay(nextNum);
+            setTodayDate();
+            
+            // Reset Fields
+            document.getElementById('customer-name').innerText = 'Customer Name';
+            document.getElementById('customer-phone').innerText = 'Phone Number';
+            document.getElementById('paid-toggle').checked = false;
+            watermark.style.display = 'none';
+            document.getElementById('search-message').textContent = "";
+            document.getElementById('search-input').value = "";
+            
+            // Reset Table
+            itemsTableBody.innerHTML = '';
+            addRow();
+            calculateTotal();
+        }
+
+        // --- 8. Data Management (Backup/Restore) ---
+        function backupData() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith(STORAGE_PREFIX) || key === STORAGE_KEY_COUNTER) {
+                    data[key] = localStorage.getItem(key);
+                }
+            }
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `zobayer_kummah_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function restoreData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    Object.keys(data).forEach(key => {
+                        localStorage.setItem(key, data[key]);
+                    });
+                    alert('Data Restored Successfully! / تم استعادة البيانات بنجاح');
+                    location.reload();
+                } catch (err) {
+                    alert('Error reading file / خطأ في قراءة الملف');
+                }
+            };
+            reader.readAsText(file);
+        }
 
     </script>
 </body>
