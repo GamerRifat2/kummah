@@ -93,26 +93,13 @@
                 max-width: 100%;
                 width: 100%;
                 margin: 0;
-                padding: 0;
+                padding: 1rem; /* Added padding to prevent content touching edges */
             }
             .controls, .paid-toggle-container, #add-item-btn, .delete-row {
                 display: none !important;
             }
             .editable {
                 border-bottom: none;
-            }
-            /* Compact spacing for print to fit one page */
-            header {
-                padding-bottom: 10px !important;
-            }
-            .mt-6, .mt-8, .mt-12 {
-                margin-top: 1rem !important;
-            }
-            .mb-6, .mb-8 {
-                margin-bottom: 1rem !important;
-            }
-            .p-4 {
-                padding: 0.75rem !important;
             }
             
             /* Ensure background colors print */
@@ -179,9 +166,9 @@
         </div>
 
         <!-- Bilingual Header -->
-        <header class="flex flex-col md:flex-row justify-between items-center pb-6 border-b relative z-10 gap-4 md:gap-0">
+        <header class="flex flex-col md:flex-row print:flex-row justify-between items-center pb-6 border-b relative z-10 gap-4 md:gap-0 print:gap-0">
             <!-- Left: English Details -->
-            <div class="text-center md:text-left w-full md:w-1/3 order-2 md:order-1 pt-2">
+            <div class="text-center md:text-left print:text-left w-full md:w-1/3 print:w-1/3 order-2 md:order-1 pt-2">
                 <h1 class="font-bold text-gray-800 text-lg uppercase leading-tight mb-1">ZOBAYER KUMMAH SHOP</h1>
                 <p class="text-xs text-gray-600">Shop No E19, Al Qawf Mart</p>
                 <p class="text-xs text-gray-600">Salalah, Oman</p>
@@ -189,7 +176,7 @@
             </div>
 
             <!-- Center: Logo -->
-            <div class="text-center w-full md:w-1/3 order-1 md:order-2 flex justify-center">
+            <div class="text-center w-full md:w-1/3 print:w-1/3 order-1 md:order-2 flex justify-center">
                 <img src="logo.png" 
                      onerror="this.style.display='none'"
                      alt="Logo" 
@@ -197,7 +184,7 @@
             </div>
 
             <!-- Right: Arabic Details -->
-            <div class="text-center md:text-right w-full md:w-1/3 order-3 md:order-3 pt-2 arabic-text">
+            <div class="text-center md:text-right print:text-right w-full md:w-1/3 print:w-1/3 order-3 md:order-3 pt-2 arabic-text">
                 <h1 contenteditable="true" class="editable font-bold text-gray-800 text-xl leading-tight mb-1">محل زبير للكمة</h1>
                 <p contenteditable="true" class="editable text-sm text-gray-600">محل رقم ١٩، سوق القوف</p>
                 <p contenteditable="true" class="editable text-sm text-gray-600">صلالة، سلطنة عمان</p>
@@ -230,12 +217,12 @@
                 <h3 class="text-xs font-bold uppercase text-gray-500 tracking-wider">Billed To</h3>
                 <h3 class="text-sm font-bold text-gray-500 arabic-text">فاتورة إلى</h3>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
                 <div>
                      <label class="block text-xs text-gray-400">Customer Name / اسم العميل</label>
                     <div contenteditable="true" id="customer-name" class="editable text-lg font-bold text-gray-800 w-full p-1" data-placeholder="Name">Customer Name</div>
                 </div>
-                <div class="md:text-right">
+                <div class="md:text-right print:text-right">
                     <label class="block text-xs text-gray-400">Phone / رقم الهاتف</label>
                     <div contenteditable="true" id="customer-phone" class="editable text-gray-600 w-full p-1" data-placeholder="Phone">Phone Number</div>
                 </div>
@@ -286,7 +273,7 @@
         
         <!-- Footer -->
         <footer class="mt-12 pt-6 border-t border-gray-200 text-gray-500 text-sm">
-            <div class="flex flex-col md:flex-row justify-between items-end">
+            <div class="flex flex-col md:flex-row print:flex-row justify-between items-end">
                  <!-- Contact Info -->
                  <div class="text-left space-y-1">
                     <p class="text-xs uppercase font-bold text-gray-800">Company Reg Details / بيانات السجل التجاري</p>
@@ -310,7 +297,7 @@
                     <img src="WhatsApp Image 2026-01-22 at 11.27.08 AM.jpeg" 
                     onerror="this.style.display='none'"
                     alt="Scan Me" 
-                    class="w-16 h-16 object-cover border rounded">
+                    class="w-32 h-auto object-contain border rounded shadow-sm">
                  </div>
             </div>
             
