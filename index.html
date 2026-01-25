@@ -3,17 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Generator - Zobayer Kummah Shop</title>
+    <title>Zobayer Kummah Shop Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons for better UI -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
+        body { font-family: 'Inter', sans-serif; }
+        .arabic-text { font-family: 'Cairo', sans-serif; direction: rtl; }
+        
+        /* Tab Navigation Styles */
+        .tab-btn.active {
+            background-color: #2563eb; /* blue-600 */
+            color: white;
+            border-bottom: 2px solid #1d4ed8;
         }
-        .arabic-text {
-            font-family: 'Cairo', sans-serif;
-            direction: rtl;
+        .tab-btn {
+            transition: all 0.3s ease;
         }
+
+        /* Invoice Container (Existing) */
         .invoice-container {
             max-width: 850px;
             margin: 2rem auto;
@@ -23,7 +32,6 @@
             background-color: white;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        /* Visual cue for editable fields */
         .editable {
             cursor: text;
             min-width: 30px;
@@ -37,20 +45,16 @@
             outline: none;
             border-radius: 0.25rem;
         }
-        .item-row:hover .delete-row {
-            opacity: 1;
-        }
-        .delete-row {
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-        }
-        /* Paid Seal Styles */
+        .item-row:hover .delete-row { opacity: 1; }
+        .delete-row { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        
+        /* Paid Seal */
         .paid-seal {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-15deg);
-            border: 4px solid #22c55e; /* green-500 */
+            border: 4px solid #22c55e;
             border-radius: 12px;
             padding: 1rem 2rem;
             text-align: center;
@@ -60,510 +64,971 @@
             display: none;
             color: #22c55e;
         }
-        .paid-seal-text-en {
-            font-size: 3rem;
-            font-weight: 700;
-            line-height: 1;
-            text-transform: uppercase;
-        }
-        .paid-seal-text-ar {
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1;
-            font-family: 'Cairo', sans-serif;
-            margin-top: 0.5rem;
-        }
+        .paid-seal-text-en { font-size: 3rem; font-weight: 700; line-height: 1; text-transform: uppercase; }
+        .paid-seal-text-ar { font-size: 2.5rem; font-weight: 700; line-height: 1; font-family: 'Cairo', sans-serif; margin-top: 0.5rem; }
+
+        /* Hidden Statement Container by default */
+        #statement-print-area { display: none; }
 
         /* Print Styles */
         @media print {
-            @page {
-                size: A4;
-                margin: 0.5cm;
-            }
-            body {
-                margin: 0;
-                padding: 0;
-                background-color: white;
-                -webkit-print-color-adjust: exact;
-                zoom: 0.95; /* Slight scale down to ensure fit */
-            }
-            .invoice-container {
-                box-shadow: none;
-                border: none;
-                max-width: 100%;
-                width: 100%;
-                margin: 0;
-                padding: 1rem; /* Added padding to prevent content touching edges */
-            }
-            .controls, .paid-toggle-container, #add-item-btn, .delete-row {
-                display: none !important;
-            }
-            .editable {
-                border-bottom: none;
-            }
+            @page { size: A4; margin: 0.5cm; }
+            body { margin: 0; padding: 0; background-color: white; -webkit-print-color-adjust: exact; zoom: 0.95; }
             
-            /* Ensure background colors print */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+            /* GLOBAL HIDES */
+            .no-print, nav, .controls, #daily-tab, #wholesale-tab, button { display: none !important; }
+            
+            /* PRINT MODE: INVOICE */
+            body.print-mode-invoice #invoice-tab { display: block !important; }
+            body.print-mode-invoice #statement-print-area { display: none !important; }
+            body.print-mode-invoice .invoice-container {
+                box-shadow: none; border: none; max-width: 100%; width: 100%; margin: 0; padding: 1rem;
             }
+            body.print-mode-invoice .delete-row, body.print-mode-invoice #add-item-btn { display: none !important; }
+            body.print-mode-invoice .editable { border-bottom: none; }
+
+            /* PRINT MODE: STATEMENT */
+            body.print-mode-statement #invoice-tab { display: none !important; }
+            body.print-mode-statement #statement-print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+            body.print-mode-statement * { visibility: hidden; }
+            body.print-mode-statement #statement-print-area, body.print-mode-statement #statement-print-area * { visibility: visible; }
+
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 min-h-screen pb-12">
 
-    <!-- Controls (Search & Actions) -->
-    <div class="controls max-w-[850px] mx-auto mt-6 mb-2 px-4 print:hidden">
-        <!-- Search Section -->
-        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
-            <h3 class="text-sm font-bold text-gray-500 uppercase mb-2">Invoice Memory / ذاكرة الفواتير</h3>
-            <div class="flex gap-2">
-                <input type="number" id="search-input" placeholder="Enter Invoice No / أدخل رقم الفاتورة" class="flex-grow p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <button onclick="searchInvoice()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors">Search / بحث</button>
-            </div>
-            <p id="search-message" class="text-xs mt-2 font-medium"></p>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-wrap gap-3 justify-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-             <button onclick="generateNewInvoice()" class="flex-1 bg-gray-600 text-white px-4 py-3 rounded-lg hover:bg-gray-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
-                New Invoice / فاتورة جديدة
-            </button>
-            <button onclick="saveInvoice()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
-                Save / حفظ
-            </button>
-            <button onclick="window.print()" class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-bold shadow transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print / طباعة
-            </button>
-        </div>
-        
-        <div class="mt-4 flex flex-col md:flex-row justify-between items-center gap-3">
-             <div class="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 flex items-center gap-2">
-                <label for="paid-toggle" class="font-medium text-gray-700 cursor-pointer select-none text-sm">Mark as PAID / مدفوع</label>
-                <input type="checkbox" id="paid-toggle" class="h-5 w-5 rounded text-green-600 focus:ring-green-500 cursor-pointer">
+    <!-- NAVIGATION TABS & GLOBAL ACTIONS -->
+    <nav class="bg-white shadow-md sticky top-0 z-50 px-4 pt-3 pb-3 no-print">
+        <div class="max-w-[850px] mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+            <!-- Tabs (REORDERED: Monthly -> Wholesale -> Invoice) -->
+            <div class="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+                <button onclick="switchTab('daily')" id="btn-daily" class="tab-btn active flex-1 py-2 px-4 rounded-lg font-bold text-gray-600 hover:bg-gray-50 whitespace-nowrap flex items-center justify-center gap-2 text-sm border">
+                    <i data-lucide="calendar-days" class="w-4 h-4"></i> Monthly Hisab
+                </button>
+                <button onclick="switchTab('wholesale')" id="btn-wholesale" class="tab-btn flex-1 py-2 px-4 rounded-lg font-bold text-gray-600 hover:bg-gray-50 whitespace-nowrap flex items-center justify-center gap-2 text-sm border">
+                    <i data-lucide="users" class="w-4 h-4"></i> Wholesale
+                </button>
+                <button onclick="switchTab('invoice')" id="btn-invoice" class="tab-btn flex-1 py-2 px-4 rounded-lg font-bold text-gray-600 hover:bg-gray-50 whitespace-nowrap flex items-center justify-center gap-2 text-sm border">
+                    <i data-lucide="file-text" class="w-4 h-4"></i> Invoice
+                </button>
             </div>
 
-            <!-- Data Backup Controls -->
-            <div class="flex gap-2 text-xs text-gray-500">
-                <button onclick="backupData()" class="hover:text-blue-600 underline">Backup Data / نسخ احتياطي</button>
-                <span>|</span>
-                <label class="hover:text-blue-600 underline cursor-pointer">
-                    Restore Data / استعادة
+            <!-- Global Data Controls (Backup/Restore) -->
+            <div class="flex items-center gap-2 shrink-0 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                <button onclick="backupData()" class="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-100 shadow-sm transition-colors" title="Download Backup File">
+                    <i data-lucide="download" class="w-3 h-3"></i> Backup
+                </button>
+                <label class="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-100 shadow-sm cursor-pointer transition-colors" title="Restore from Backup File">
+                    <i data-lucide="upload" class="w-3 h-3"></i> Restore
                     <input type="file" class="hidden" onchange="restoreData(this)" accept=".json">
                 </label>
             </div>
         </div>
-    </div>
+    </nav>
 
-    <div class="invoice-container relative overflow-hidden" id="invoice">
-        <!-- PAID Bilingual Seal -->
-        <div id="paid-watermark" class="paid-seal">
-            <div class="paid-seal-text-en">PAID</div>
-            <div class="paid-seal-text-ar">مدفوع</div>
-        </div>
-
-        <!-- Bilingual Header -->
-        <header class="flex flex-col md:flex-row print:flex-row justify-between items-center pb-6 border-b relative z-10 gap-4 md:gap-0 print:gap-0">
-            <!-- Left: English Details -->
-            <div class="text-center md:text-left print:text-left w-full md:w-1/3 print:w-1/3 order-2 md:order-1 pt-2">
-                <h1 class="font-bold text-gray-800 text-lg uppercase leading-tight mb-1">ZOBAYER KUMMAH SHOP</h1>
-                <p class="text-xs text-gray-600">Shop No E19, Al Qawf Mart</p>
-                <p class="text-xs text-gray-600">Salalah, Oman</p>
-                <p class="text-xs text-gray-600 mt-1"><strong>Tel:</strong> 93526874</p>
-            </div>
-
-            <!-- Center: Logo -->
-            <div class="text-center w-full md:w-1/3 print:w-1/3 order-1 md:order-2 flex justify-center">
-                <img src="logo.png" 
-                     onerror="this.style.display='none'"
-                     alt="Logo" 
-                     class="h-28 w-auto object-contain mx-auto">
-            </div>
-
-            <!-- Right: Arabic Details -->
-            <div class="text-center md:text-right print:text-right w-full md:w-1/3 print:w-1/3 order-3 md:order-3 pt-2 arabic-text">
-                <h1 contenteditable="true" class="editable font-bold text-gray-800 text-xl leading-tight mb-1">محل زبير للكمة</h1>
-                <p contenteditable="true" class="editable text-sm text-gray-600">محل رقم ١٩، سوق القوف</p>
-                <p contenteditable="true" class="editable text-sm text-gray-600">صلالة، سلطنة عمان</p>
-                <p class="text-sm text-gray-600 mt-1"><strong class="mx-1">هاتف:</strong><span class="font-sans">93526874</span></p>
-            </div>
-        </header>
-
-        <!-- Invoice Title & Meta -->
-        <div class="flex justify-between items-center mt-6 mb-6">
-            <div class="text-left">
-                <div class="flex flex-col">
-                    <span class="text-gray-500 text-xs font-bold uppercase">Invoice No / رقم الفاتورة</span>
-                    <span id="invoice-number" class="text-xl font-bold text-gray-800 font-mono"></span>
+    <!-- TAB 1: MONTHLY HISAB (Now First) -->
+    <div id="daily-tab" class="tab-content block max-w-[850px] mx-auto mt-6 px-4">
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <i data-lucide="calendar-days" class="text-blue-600"></i> Monthly Hisab
+                </h2>
+                <div class="flex items-center gap-2 bg-blue-50 p-2 rounded-lg">
+                    <label class="text-sm font-bold text-blue-800">Select Month:</label>
+                    <input type="month" id="hisab-month-filter" class="border border-blue-200 rounded p-1 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
-            </div>
-            <div class="text-center">
-                <h2 class="text-3xl font-bold uppercase text-gray-800 tracking-wide">INVOICE <span class="arabic-text font-normal">فاتورة</span></h2>
-            </div>
-            <div class="text-right">
-                <div class="flex flex-col">
-                     <span class="text-gray-500 text-xs font-bold uppercase">Date / التاريخ</span>
-                    <span id="invoice-date" contenteditable="true" class="editable text-xl font-bold text-gray-800"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Billed To Section -->
-        <section class="mb-8 bg-gray-50 rounded-lg p-4 border border-gray-100">
-            <div class="flex justify-between items-end mb-2">
-                <h3 class="text-xs font-bold uppercase text-gray-500 tracking-wider">Billed To</h3>
-                <h3 class="text-sm font-bold text-gray-500 arabic-text">فاتورة إلى</h3>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
-                <div>
-                     <label class="block text-xs text-gray-400">Customer Name / اسم العميل</label>
-                    <div contenteditable="true" id="customer-name" class="editable text-lg font-bold text-gray-800 w-full p-1" data-placeholder="Name">Customer Name</div>
-                </div>
-                <div class="md:text-right print:text-right">
-                    <label class="block text-xs text-gray-400">Phone / رقم الهاتف</label>
-                    <div contenteditable="true" id="customer-phone" class="editable text-gray-600 w-full p-1" data-placeholder="Phone">Phone Number</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Items Table -->
-        <section>
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="bg-gray-800 text-white">
-                        <th class="p-3 text-sm font-semibold uppercase tracking-wider w-3/4 rounded-tl-lg rounded-bl-lg">
-                            <div class="flex justify-between">
-                                <span>Item Description</span>
-                            </div>
-                        </th>
-                        <th class="p-3 text-right text-sm font-semibold uppercase tracking-wider w-1/4 rounded-tr-lg rounded-br-lg">
-                            <div class="flex flex-col items-end">
-                                <span>Amount (OMR)</span>
-                                <span class="arabic-text text-xs text-gray-300">المبلغ (ر.ع)</span>
-                            </div>
-                        </th>
-                        <th class="w-10 print:hidden bg-white"></th>
-                    </tr>
-                </thead>
-                <tbody id="items-table-body">
-                    <!-- Rows will be added here -->
-                </tbody>
-            </table>
-            <button id="add-item-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors flex items-center gap-2 print:hidden">
-                <span>+</span> Add Item / إضافة صنف
-            </button>
-        </section>
-
-        <!-- Total Section -->
-        <section class="mt-8 flex justify-end">
-            <div class="w-full max-w-sm">
-                <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span class="text-gray-600 font-medium text-sm">Subtotal / <span class="arabic-text">المجموع الفرعي</span></span>
-                    <span class="font-bold text-gray-800"><span id="subtotal">0.000</span></span>
-                </div>
-                <div class="flex justify-between items-center py-3 bg-gray-100 px-4 rounded-lg mt-3 border border-gray-200">
-                    <span class="text-xl font-bold text-gray-800">Total / <span class="arabic-text">الإجمالي</span></span>
-                    <span class="text-xl font-bold text-blue-900"><span id="total">0.000</span> <span class="text-sm text-gray-500">OMR</span></span>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Footer -->
-        <footer class="mt-12 pt-6 border-t border-gray-200 text-gray-500 text-sm">
-            <div class="flex flex-col md:flex-row print:flex-row justify-between items-end">
-                 <!-- Contact Info -->
-                 <div class="text-left space-y-1">
-                    <p class="text-xs uppercase font-bold text-gray-800">Company Reg Details / بيانات السجل التجاري</p>
-                    <p>
-                        <strong class="text-xs">CR Name:</strong> <span contenteditable="true" class="editable font-bold text-gray-700">ZOBAYER KUMMAH SHOP</span>
-                    </p>
-                     <p>
-                        <strong class="text-xs">CR No / رقم السجل:</strong> <span contenteditable="true" class="editable font-mono">1273959</span>
-                    </p>
-                    <p>
-                        <strong class="text-xs">Email:</strong> <span contenteditable="true" class="editable">zobayerbhuiyan2@gmail.com</span>
-                    </p>
-                    <p class="flex items-center gap-1">
-                        <img src="whatsapp.png" alt="WhatsApp" class="w-4 h-4 object-contain">
-                        <strong class="text-xs">WhatsApp:</strong> <span contenteditable="true" class="editable">93526874</span>
-                    </p>
-                 </div>
-
-                 <!-- QR Code Placeholder -->
-                 <div class="mt-4 md:mt-0">
-                    <img src="WhatsApp Image 2026-01-22 at 11.27.08 AM.jpeg" 
-                    onerror="this.style.display='none'"
-                    alt="Scan Me" 
-                    class="w-32 h-auto object-contain border rounded shadow-sm">
-                 </div>
             </div>
             
-            <p class="mt-8 italic text-center text-[10px] text-gray-400">
-                This invoice is electronically generated / هذه الفاتورة صادرة إلكترونياً
-            </p>
-        </footer>
+            <!-- Add Entry Form (Keeps specific date) -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div class="md:col-span-3 flex flex-col justify-end">
+                    <label class="block text-xs text-gray-500 mb-1">Entry Date</label>
+                    <input type="date" id="daily-date" class="w-full p-2 border border-gray-300 rounded text-sm">
+                </div>
+                <div class="md:col-span-4 flex flex-col justify-end">
+                    <label class="block text-xs text-gray-500 mb-1">Description</label>
+                    <!-- Quick Fill Buttons -->
+                    <div class="flex flex-wrap gap-1 mb-1.5">
+                        <button onclick="document.getElementById('daily-desc').value='Handmade Kumma'" class="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 transition-colors">Handmade Kumma</button>
+                        <button onclick="document.getElementById('daily-desc').value='Computer Kumma'" class="text-[10px] px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded hover:bg-purple-100 transition-colors">Computer Kumma</button>
+                        <button onclick="document.getElementById('daily-desc').value='Mosar'" class="text-[10px] px-2 py-1 bg-orange-50 text-orange-700 border border-orange-200 rounded hover:bg-orange-100 transition-colors">Mosar</button>
+                    </div>
+                    <input type="text" id="daily-desc" placeholder="e.g., Sold Cap, Lunch" class="w-full p-2 border border-gray-300 rounded text-sm">
+                </div>
+                <div class="md:col-span-3 flex flex-col justify-end">
+                    <label class="block text-xs text-gray-500 mb-1">Amount</label>
+                    <input type="number" id="daily-amount" placeholder="0.000" step="0.001" class="w-full p-2 border border-gray-300 rounded font-mono text-sm">
+                </div>
+                <div class="md:col-span-2 flex gap-1 items-end">
+                    <button onclick="addDailyEntry('income')" class="flex-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-sm py-2 h-[38px]">+</button>
+                    <button onclick="addDailyEntry('expense')" class="flex-1 bg-red-600 hover:bg-red-700 text-white rounded font-bold text-sm py-2 h-[38px]">-</button>
+                </div>
+            </div>
+
+            <!-- Summary Cards (Monthly) -->
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-50 p-4 rounded-lg border border-green-100 text-center">
+                    <h3 class="text-xs font-bold text-green-600 uppercase">Monthly Income</h3>
+                    <p class="text-xl font-bold text-green-800 mt-1" id="daily-total-income">0.000</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg border border-red-100 text-center">
+                    <h3 class="text-xs font-bold text-red-600 uppercase">Monthly Expense</h3>
+                    <p class="text-xl font-bold text-red-800 mt-1" id="daily-total-expense">0.000</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 text-center">
+                    <h3 class="text-xs font-bold text-blue-600 uppercase">Monthly Balance</h3>
+                    <p class="text-xl font-bold text-blue-800 mt-1" id="daily-net-balance">0.000</p>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 border-b">
+                            <th class="p-3">Date/Time</th>
+                            <th class="p-3">Description</th>
+                            <th class="p-3 text-right">Income</th>
+                            <th class="p-3 text-right">Expense</th>
+                            <th class="p-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="daily-list-body">
+                        <!-- Entries go here -->
+                    </tbody>
+                </table>
+                <div id="daily-empty-msg" class="text-center py-4 text-gray-400 text-xs hidden">No entries for this month.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: WHOLESALE HISAB (Now Second) -->
+    <div id="wholesale-tab" class="tab-content hidden max-w-[850px] mx-auto mt-6 px-4">
+        
+        <!-- View 1: Customer List -->
+        <div id="ws-customer-list-view" class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <i data-lucide="users" class="text-indigo-600"></i> Wholesale Customers
+            </h2>
+
+            <div class="flex gap-2 mb-6">
+                <input type="text" id="new-customer-name" placeholder="New Customer Name / اسم العميل" class="flex-grow p-2 border border-gray-300 rounded">
+                 <input type="text" id="new-customer-phone" placeholder="Phone" class="w-1/3 p-2 border border-gray-300 rounded">
+                <button onclick="addWsCustomer()" class="bg-indigo-600 text-white px-4 rounded hover:bg-indigo-700 font-medium">Add</button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4" id="ws-customers-grid">
+                <!-- Customer cards go here -->
+            </div>
+        </div>
+
+        <!-- View 2: Customer Detail (Hidden by default) -->
+        <div id="ws-customer-detail-view" class="hidden bg-white rounded-lg shadow p-6">
+            <div class="flex flex-col md:flex-row justify-between mb-4 gap-4">
+                <button onclick="showWsCustomerList()" class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm font-medium self-start">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to List
+                </button>
+                
+                <!-- PRINT CONTROLS -->
+                <div class="flex flex-col items-end gap-2 bg-gray-100 p-3 rounded-lg self-end">
+                    <div class="flex items-center gap-2">
+                        <div class="flex flex-col">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase">From</label>
+                            <input type="date" id="print-start-date" class="text-xs p-1 border rounded w-28">
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase">To</label>
+                            <input type="date" id="print-end-date" class="text-xs p-1 border rounded w-28">
+                        </div>
+                        <button onclick="printWsStatement()" class="bg-gray-800 hover:bg-black text-white px-3 py-2 rounded flex items-center gap-2 text-xs font-bold shadow-sm h-full mt-3">
+                            <i data-lucide="printer" class="w-3 h-3"></i> Print
+                        </button>
+                    </div>
+                    <!-- CHECKBOX FOR PREVIOUS DUE -->
+                    <div class="flex items-center gap-1 w-full justify-end">
+                        <input type="checkbox" id="print-with-due" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" checked>
+                        <label for="print-with-due" class="text-[10px] text-gray-600 font-bold cursor-pointer select-none">Include Previous Due</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800" id="ws-detail-name">Customer Name</h2>
+                    <p class="text-gray-500 text-sm" id="ws-detail-phone">Phone: -</p>
+                </div>
+                <div class="mt-2 md:mt-0 text-right bg-red-50 px-4 py-2 rounded-lg border border-red-100">
+                    <p class="text-xs text-red-500 font-bold uppercase">Total Due Amount</p>
+                    <p class="text-3xl font-bold text-red-600 font-mono"><span id="ws-detail-due">0.000</span> <span class="text-sm">OMR</span></p>
+                </div>
+            </div>
+
+            <!-- Transaction Form -->
+            <div class="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+                <h3 class="text-sm font-bold text-gray-700 mb-3">Add Transaction</h3>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-3">
+                         <label class="text-xs text-gray-500 block mb-1">Date</label>
+                        <input type="date" id="ws-trans-date" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                    <div class="md:col-span-5">
+                        <label class="text-xs text-gray-500 block mb-1">Remark / Item</label>
+                        <input type="text" id="ws-trans-remark" placeholder="e.g. 10 Kummah caps" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="text-xs text-gray-500 block mb-1">Amount</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="ws-trans-amount" placeholder="0.000" step="0.001" class="w-full p-2 border border-gray-300 rounded text-sm font-mono">
+                            <button onclick="addWsTransaction('buy')" class="bg-red-100 text-red-700 px-3 rounded hover:bg-red-200 font-bold text-xs border border-red-300 flex flex-col items-center justify-center min-w-[60px]">
+                                <span>BUY</span>
+                                <span>(+)</span>
+                            </button>
+                             <button onclick="addWsTransaction('pay')" class="bg-green-100 text-green-700 px-3 rounded hover:bg-green-200 font-bold text-xs border border-green-300 flex flex-col items-center justify-center min-w-[60px]">
+                                <span>PAY</span>
+                                <span>(-)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="bg-gray-800 text-white">
+                            <th class="p-3 rounded-tl-lg">Date</th>
+                            <th class="p-3">Remark</th>
+                            <th class="p-3 text-right">Purchase (+)</th>
+                            <th class="p-3 text-right">Payment (-)</th>
+                             <th class="p-3 text-right rounded-tr-lg">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ws-trans-body">
+                        <!-- Transactions -->
+                    </tbody>
+                </table>
+                <div id="ws-empty-state" class="text-center py-8 text-gray-400 hidden">
+                    No transactions yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: EXISTING INVOICE GENERATOR (Now Last) -->
+    <div id="invoice-tab" class="tab-content hidden block">
+        <!-- Controls (Search & Actions) -->
+        <div class="controls max-w-[850px] mx-auto mt-6 mb-2 px-4 print:hidden">
+            <!-- Search Section -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+                <h3 class="text-sm font-bold text-gray-500 uppercase mb-2">Invoice Memory / ذاكرة الفواتير</h3>
+                <div class="flex gap-2">
+                    <input type="number" id="search-input" placeholder="Enter Invoice No / أدخل رقم الفاتورة" class="flex-grow p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <button onclick="searchInvoice()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors">Search</button>
+                </div>
+                <p id="search-message" class="text-xs mt-2 font-medium"></p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-3 justify-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                 <button onclick="generateNewInvoice()" class="flex-1 bg-gray-600 text-white px-4 py-3 rounded-lg hover:bg-gray-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
+                    New Invoice
+                </button>
+                <button onclick="saveInvoice()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 font-bold shadow transition-transform transform hover:-translate-y-0.5">
+                    Save Invoice
+                </button>
+                <button onclick="printInvoiceTab()" class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-bold shadow transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                    Print Invoice
+                </button>
+            </div>
+            
+            <div class="mt-4 flex justify-start items-center gap-3">
+                 <div class="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 flex items-center gap-2">
+                    <label for="paid-toggle" class="font-medium text-gray-700 cursor-pointer select-none text-sm">Mark as PAID / مدفوع</label>
+                    <input type="checkbox" id="paid-toggle" class="h-5 w-5 rounded text-green-600 focus:ring-green-500 cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <div class="invoice-container relative overflow-hidden" id="invoice">
+            <!-- PAID Bilingual Seal -->
+            <div id="paid-watermark" class="paid-seal">
+                <div class="paid-seal-text-en">PAID</div>
+                <div class="paid-seal-text-ar">مدفوع</div>
+            </div>
+
+            <!-- Bilingual Header -->
+            <header class="flex flex-col md:flex-row print:flex-row justify-between items-center pb-6 border-b relative z-10 gap-4 md:gap-0 print:gap-0">
+                <div class="text-center md:text-left print:text-left w-full md:w-1/3 print:w-1/3 order-2 md:order-1 pt-2">
+                    <h1 class="font-bold text-gray-800 text-lg uppercase leading-tight mb-1">ZOBAYER KUMMAH SHOP</h1>
+                    <p class="text-xs text-gray-600">Shop No E19, Al Qawf Mart</p>
+                    <p class="text-xs text-gray-600">Salalah, Oman</p>
+                    <p class="text-xs text-gray-600 mt-1"><strong>Tel:</strong> 93526874</p>
+                </div>
+                <div class="text-center w-full md:w-1/3 print:w-1/3 order-1 md:order-2 flex justify-center">
+                    <!-- Placeholder Logo -->
+                    <div class="h-28 w-28 bg-gray-100 rounded-full flex items-center justify-center border-2 border-gray-200">
+                         <span class="text-xs text-gray-400">Logo</span>
+                    </div>
+                </div>
+                <div class="text-center md:text-right print:text-right w-full md:w-1/3 print:w-1/3 order-3 md:order-3 pt-2 arabic-text">
+                    <h1 contenteditable="true" class="editable font-bold text-gray-800 text-xl leading-tight mb-1">محل زبير للكمة</h1>
+                    <p contenteditable="true" class="editable text-sm text-gray-600">محل رقم ١٩، سوق القوف</p>
+                    <p contenteditable="true" class="editable text-sm text-gray-600">صلالة، سلطنة عمان</p>
+                    <p class="text-sm text-gray-600 mt-1"><strong class="mx-1">هاتف:</strong><span class="font-sans">93526874</span></p>
+                </div>
+            </header>
+
+            <!-- Invoice Title & Meta -->
+            <div class="flex justify-between items-center mt-6 mb-6">
+                <div class="text-left">
+                    <div class="flex flex-col">
+                        <span class="text-gray-500 text-xs font-bold uppercase">Invoice No</span>
+                        <span id="invoice-number" class="text-xl font-bold text-gray-800 font-mono"></span>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold uppercase text-gray-800 tracking-wide">INVOICE <span class="arabic-text font-normal">فاتورة</span></h2>
+                </div>
+                <div class="text-right">
+                    <div class="flex flex-col">
+                         <span class="text-gray-500 text-xs font-bold uppercase">Date</span>
+                        <span id="invoice-date" contenteditable="true" class="editable text-xl font-bold text-gray-800"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Billed To Section -->
+            <section class="mb-8 bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div class="flex justify-between items-end mb-2">
+                    <h3 class="text-xs font-bold uppercase text-gray-500 tracking-wider">Billed To</h3>
+                    <h3 class="text-sm font-bold text-gray-500 arabic-text">فاتورة إلى</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
+                    <div>
+                         <label class="block text-xs text-gray-400">Customer Name</label>
+                        <div contenteditable="true" id="customer-name" class="editable text-lg font-bold text-gray-800 w-full p-1" data-placeholder="Name">Customer Name</div>
+                    </div>
+                    <div class="md:text-right print:text-right">
+                        <label class="block text-xs text-gray-400">Phone</label>
+                        <div contenteditable="true" id="customer-phone" class="editable text-gray-600 w-full p-1" data-placeholder="Phone">Phone Number</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Items Table -->
+            <section>
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-800 text-white">
+                            <th class="p-3 text-sm font-semibold uppercase tracking-wider w-3/4 rounded-tl-lg rounded-bl-lg">Item Description</th>
+                            <th class="p-3 text-right text-sm font-semibold uppercase tracking-wider w-1/4 rounded-tr-lg rounded-br-lg">Amount (OMR)</th>
+                            <th class="w-10 print:hidden bg-white"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-table-body">
+                        <!-- Rows will be added here -->
+                    </tbody>
+                </table>
+                <button id="add-item-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors flex items-center gap-2 print:hidden">
+                    <span>+</span> Add Item
+                </button>
+            </section>
+
+            <!-- Total Section -->
+            <section class="mt-8 flex justify-end">
+                <div class="w-full max-w-sm">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span class="text-gray-600 font-medium text-sm">Subtotal</span>
+                        <span class="font-bold text-gray-800"><span id="subtotal">0.000</span></span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 bg-gray-100 px-4 rounded-lg mt-3 border border-gray-200">
+                        <span class="text-xl font-bold text-gray-800">Total</span>
+                        <span class="text-xl font-bold text-blue-900"><span id="total">0.000</span> <span class="text-sm text-gray-500">OMR</span></span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Footer -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 text-gray-500 text-sm">
+                <div class="flex flex-col md:flex-row print:flex-row justify-between items-end">
+                     <div class="text-left space-y-1">
+                        <p class="text-xs uppercase font-bold text-gray-800">Zobayer Kummah Shop</p>
+                        <p><strong class="text-xs">CR No:</strong> <span class="font-mono">1273959</span></p>
+                        <p><strong class="text-xs">WhatsApp:</strong> 93526874</p>
+                     </div>
+                </div>
+                <p class="mt-8 italic text-center text-[10px] text-gray-400">Generated Electronically</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- PRINT TEMPLATE: WHOLESALE STATEMENT -->
+    <div id="statement-print-area" class="p-8 max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b-2 border-gray-800 pb-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 uppercase">Zobayer Kummah Shop</h1>
+                <p class="text-sm text-gray-600">Shop No E19, Al Qawf Mart, Salalah</p>
+                <p class="text-sm text-gray-600">Tel/WhatsApp: 93526874</p>
+            </div>
+            <div class="text-right">
+                <h2 class="text-3xl font-bold uppercase text-gray-800">STATEMENT OF ACCOUNT</h2>
+                <h3 class="text-lg font-bold text-gray-500 arabic-text">كشف حساب</h3>
+                <p class="text-sm text-gray-500 mt-1">
+                    Period: <span id="print-stmt-period"></span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Customer Info -->
+        <div class="bg-gray-50 p-4 border rounded mb-6 flex justify-between">
+            <div>
+                <span class="text-xs font-bold text-gray-400 uppercase block">Customer / العميل</span>
+                <h3 class="text-xl font-bold text-gray-800" id="print-stmt-name">Customer Name</h3>
+                <p class="text-gray-600" id="print-stmt-phone">Phone</p>
+            </div>
+            <div class="text-right">
+                <span class="text-xs font-bold text-gray-400 uppercase block">Total Due / المبلغ المستحق</span>
+                <h3 class="text-2xl font-bold text-red-600 font-mono" id="print-stmt-due">0.000 OMR</h3>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <table class="w-full text-left text-sm border-collapse mb-8">
+            <thead>
+                <tr class="border-b-2 border-gray-800">
+                    <th class="py-2 px-1 font-bold text-gray-700">Date</th>
+                    <th class="py-2 px-1 font-bold text-gray-700">Description</th>
+                    <th class="py-2 px-1 text-right font-bold text-gray-700">Debit (OMR)</th>
+                    <th class="py-2 px-1 text-right font-bold text-gray-700">Credit (OMR)</th>
+                    <th class="py-2 px-1 text-right font-bold text-gray-700">Balance</th>
+                </tr>
+            </thead>
+            <tbody id="print-stmt-body">
+                <!-- Rows -->
+            </tbody>
+        </table>
+
+        <!-- Footer -->
+        <div class="border-t border-gray-200 pt-8 mt-auto">
+            <div class="flex justify-between items-end">
+                <div class="text-center w-40">
+                    <div class="border-b border-gray-400 mb-2 h-8"></div>
+                    <p class="text-xs text-gray-500">Receiver Signature</p>
+                </div>
+                <div class="text-center w-40">
+                    <div class="border-b border-gray-400 mb-2 h-8"></div>
+                    <p class="text-xs text-gray-500">Authorized Signature</p>
+                </div>
+            </div>
+            <p class="text-center text-[10px] text-gray-400 mt-8">Thank you for your business / شكراً لتعاملكم معنا</p>
+        </div>
     </div>
 
     <script>
-        // --- 1. Invoice Number Logic ---
-        const invoiceNumberElement = document.getElementById('invoice-number');
-        const STORAGE_PREFIX = 'zobayer_inv_';
-        const STORAGE_KEY_COUNTER = 'zobayerKummahInvoiceNum';
+        // --- ICONS INITIALIZATION ---
+        lucide.createIcons();
 
-        function getCurrentInvoiceNumber() {
-            let num = localStorage.getItem(STORAGE_KEY_COUNTER);
-            if (!num) return 1000;
-            return parseInt(num, 10);
-        }
-
-        function setInvoiceNumberDisplay(num) {
-            invoiceNumberElement.textContent = String(num).padStart(6, '0');
-        }
-        
-        function initializeInvoiceNumber() {
-            let lastInvoiceNumber = localStorage.getItem(STORAGE_KEY_COUNTER);
-            if (!lastInvoiceNumber) {
-                lastInvoiceNumber = 1000;
-                localStorage.setItem(STORAGE_KEY_COUNTER, lastInvoiceNumber);
-            }
-            // For a new session, we assume we are working on the NEXT number
-            // But we don't increment until we hit "New Invoice" or first load if user wants
-            // For simplicity, let's load the *next* available number
-            let current = parseInt(lastInvoiceNumber, 10) + 1;
-            setInvoiceNumberDisplay(current);
-        }
-
-        // --- 2. Date Logic ---
-        const dateElement = document.getElementById('invoice-date');
-        
-        function setTodayDate() {
-            const today = new Date();
-            const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-            dateElement.textContent = formattedDate;
-        }
-
-        // --- 3. Calculation Logic ---
-        const itemsTableBody = document.getElementById('items-table-body');
-        const addItemBtn = document.getElementById('add-item-btn');
-
-        const calculateTotal = () => {
-            let subtotal = 0;
-            const itemAmounts = document.querySelectorAll('.item-amount');
-            
-            itemAmounts.forEach(amountEl => {
-                const cleanText = amountEl.innerText.replace(/[^0-9.-]+/g, "");
-                const amount = parseFloat(cleanText) || 0;
-                subtotal += amount;
-            });
-
-            document.getElementById('subtotal').textContent = subtotal.toFixed(3);
-            document.getElementById('total').textContent = subtotal.toFixed(3);
+        // --- GLOBAL STORAGE KEYS ---
+        const KEYS = {
+            INVOICE_PREFIX: 'zobayer_inv_',
+            INVOICE_CTR: 'zobayerKummahInvoiceNum',
+            DAILY: 'zobayer_daily_entries',
+            WS_CUSTOMERS: 'zobayer_ws_customers',
+            WS_TRANS: 'zobayer_ws_trans_' // + customerId
         };
 
-        // --- 4. Table Interactions ---
+        // --- TABS LOGIC ---
+        function switchTab(tabName) {
+            // Hide all tabs
+            ['daily', 'wholesale', 'invoice'].forEach(t => {
+                document.getElementById(`${t}-tab`).classList.add('hidden');
+                document.getElementById(`${t}-tab`).classList.remove('block');
+                document.getElementById(`btn-${t}`).classList.remove('active');
+            });
+
+            // Show selected
+            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+            document.getElementById(`${tabName}-tab`).classList.add('block');
+            document.getElementById(`btn-${tabName}`).classList.add('active');
+
+            // Refresh data if needed
+            if(tabName === 'daily') renderMonthlyHisab(); 
+            if(tabName === 'wholesale') renderWsCustomers();
+        }
+
+        // ==========================================
+        //  PRINTING LOGIC (UPDATED WITH PREVIOUS DUE CHECKBOX)
+        // ==========================================
+        function printInvoiceTab() {
+            document.body.classList.add('print-mode-invoice');
+            window.print();
+            setTimeout(() => { document.body.classList.remove('print-mode-invoice'); }, 1000);
+        }
+
+        function printWsStatement() {
+            if(!currentWsCustomerId) return;
+            
+            // Get Filters
+            const startDateVal = document.getElementById('print-start-date').value;
+            const endDateVal = document.getElementById('print-end-date').value;
+            const includeDue = document.getElementById('print-with-due').checked;
+
+            // 1. Populate Info
+            const custName = document.getElementById('ws-detail-name').textContent;
+            const custPhone = document.getElementById('ws-detail-phone').textContent;
+            
+            document.getElementById('print-stmt-name').textContent = custName;
+            document.getElementById('print-stmt-phone').textContent = custPhone;
+            
+            let periodText = "All Time";
+            if(startDateVal && endDateVal) periodText = `${startDateVal} to ${endDateVal}`;
+            else if(startDateVal) periodText = `From ${startDateVal}`;
+            document.getElementById('print-stmt-period').textContent = periodText;
+
+            // 2. Filter Transactions
+            let trans = JSON.parse(localStorage.getItem(KEYS.WS_TRANS + currentWsCustomerId) || '[]');
+            trans.sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
+
+            const tbody = document.getElementById('print-stmt-body');
+            tbody.innerHTML = '';
+            
+            let balance = 0;
+            let startBalance = 0;
+
+            // Calculate Opening Balance (Sum of transactions BEFORE start date)
+            if(startDateVal) {
+                const prevTrans = trans.filter(t => t.date < startDateVal);
+                prevTrans.forEach(t => {
+                    if(t.type === 'buy') startBalance += t.amount;
+                    else startBalance -= t.amount;
+                });
+            }
+            
+            // Determine starting balance based on Checkbox
+            if (startDateVal && includeDue) {
+                balance = startBalance;
+                
+                // Add "Previous Due" Row
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-100 font-bold bg-gray-50';
+                tr.innerHTML = `
+                    <td class="py-2 px-1 text-gray-800 text-xs">${startDateVal}</td>
+                    <td class="py-2 px-1 text-gray-800">Previous Due / الرصيد السابق</td>
+                    <td class="py-2 px-1 text-right font-mono text-gray-600"></td>
+                    <td class="py-2 px-1 text-right font-mono text-gray-600"></td>
+                    <td class="py-2 px-1 text-right font-mono font-bold text-gray-800">${startBalance.toFixed(3)}</td>
+                `;
+                tbody.appendChild(tr);
+            } else {
+                // If checkbox is unchecked, we treat start balance as 0 for this statement
+                balance = 0;
+            }
+
+            // Filter for Table
+            const printTrans = trans.filter(t => {
+                let include = true;
+                if(startDateVal && t.date < startDateVal) include = false;
+                if(endDateVal && t.date > endDateVal) include = false;
+                return include;
+            });
+
+            printTrans.forEach(t => {
+                if(t.type === 'buy') balance += t.amount;
+                else balance -= t.amount;
+
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-100';
+                tr.innerHTML = `
+                    <td class="py-2 px-1 text-gray-600 text-xs">${t.date}</td>
+                    <td class="py-2 px-1 text-gray-800">${t.remark}</td>
+                    <td class="py-2 px-1 text-right font-mono text-gray-600">${t.type === 'buy' ? t.amount.toFixed(3) : '-'}</td>
+                    <td class="py-2 px-1 text-right font-mono text-gray-600">${t.type === 'pay' ? t.amount.toFixed(3) : '-'}</td>
+                    <td class="py-2 px-1 text-right font-mono font-bold text-gray-800">${balance.toFixed(3)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Set Total Due (This is the closing balance of the generated statement)
+            document.getElementById('print-stmt-due').textContent = balance.toFixed(3) + " OMR";
+
+            // 3. Trigger Print
+            document.body.classList.add('print-mode-statement');
+            window.print();
+            setTimeout(() => { document.body.classList.remove('print-mode-statement'); }, 1000);
+        }
+
+        // ==========================================
+        //  TAB 1: INVOICE LOGIC
+        // ==========================================
+        const invoiceNumberElement = document.getElementById('invoice-number');
+        const dateElement = document.getElementById('invoice-date');
+        const itemsTableBody = document.getElementById('items-table-body');
+
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            
+            // Format for display
+            dateElement.textContent = `${dd}/${mm}/${yyyy}`;
+            
+            // Format for inputs
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+            const monthStr = `${yyyy}-${mm}`;
+            
+            document.getElementById('daily-date').value = dateStr;
+            document.getElementById('ws-trans-date').value = dateStr;
+            document.getElementById('hisab-month-filter').value = monthStr;
+            
+            // Set Print Defaults (First day of month to Today)
+            document.getElementById('print-start-date').value = `${yyyy}-${mm}-01`;
+            document.getElementById('print-end-date').value = dateStr;
+        }
+
+        function calculateTotal() {
+            let subtotal = 0;
+            document.querySelectorAll('.item-amount').forEach(el => {
+                const val = parseFloat(el.innerText.replace(/[^0-9.-]+/g, "")) || 0;
+                subtotal += val;
+            });
+            document.getElementById('subtotal').textContent = subtotal.toFixed(3);
+            document.getElementById('total').textContent = subtotal.toFixed(3);
+        }
+
         const addRow = (desc = "Omani Kummah (Hand Made)", price = "0.000") => {
-            const newRow = document.createElement('tr');
-            newRow.className = 'item-row border-b border-gray-100 hover:bg-gray-50';
-            newRow.innerHTML = `
+            const tr = document.createElement('tr');
+            tr.className = 'item-row border-b border-gray-100 hover:bg-gray-50';
+            tr.innerHTML = `
                 <td class="p-3 align-top">
-                    <div class="flex flex-col gap-1">
-                        <span contenteditable="true" class="item-desc editable w-full block font-medium text-gray-800" data-placeholder="Description">${desc}</span>
-                    </div>
+                    <span contenteditable="true" class="item-desc editable w-full block font-medium text-gray-800">${desc}</span>
                 </td>
                 <td class="p-3 align-top text-right">
                     <span contenteditable="true" class="item-amount editable w-full block text-right font-mono text-lg">${price}</span>
                 </td>
                 <td class="p-3 text-center print:hidden align-middle">
-                    <button onclick="deleteRow(this)" class="delete-row text-red-400 hover:text-red-600 font-bold p-1 rounded hover:bg-red-50">&times;</button>
+                    <button onclick="this.closest('tr').remove(); calculateTotal();" class="delete-row text-red-400 hover:text-red-600 font-bold p-1 rounded hover:bg-red-50">&times;</button>
                 </td>
             `;
-            itemsTableBody.appendChild(newRow);
-            addEventListenersToRow(newRow);
-        };
-        
-        window.deleteRow = (button) => {
-            const row = button.closest('tr');
-            row.remove();
-            calculateTotal();
-        };
-
-        const addEventListenersToRow = (row) => {
-            const cells = row.querySelectorAll('.editable');
-            cells.forEach(cell => {
-                cell.addEventListener('input', calculateTotal);
-                if (cell.classList.contains('item-amount')) {
-                    cell.addEventListener('blur', (e) => {
-                       const cleanText = e.target.innerText.replace(/[^0-9.-]+/g, "");
-                       const value = parseFloat(cleanText) || 0;
-                       e.target.innerText = value.toFixed(3);
-                       calculateTotal();
-                    });
-                    cell.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.target.blur();
-                        }
+            itemsTableBody.appendChild(tr);
+            tr.querySelectorAll('.editable').forEach(e => {
+                e.addEventListener('input', calculateTotal);
+                if(e.classList.contains('item-amount')) {
+                    e.addEventListener('blur', (ev) => {
+                        const v = parseFloat(ev.target.innerText.replace(/[^0-9.-]+/g, "")) || 0;
+                        ev.target.innerText = v.toFixed(3);
+                        calculateTotal();
                     });
                 }
             });
         };
-        
-        // --- 5. Initialization ---
-        addItemBtn.addEventListener('click', () => addRow());
-        
-        // Start fresh
-        setTodayDate();
-        initializeInvoiceNumber();
-        addRow(); // Initial row
-        calculateTotal();
 
-        const paidToggle = document.getElementById('paid-toggle');
-        const watermark = document.getElementById('paid-watermark');
-        paidToggle.addEventListener('change', () => {
-            watermark.style.display = paidToggle.checked ? 'block' : 'none';
-        });
+        document.getElementById('add-item-btn').addEventListener('click', () => addRow());
 
-        // --- 6. Auto-clear Placeholders ---
-        const setupAutoClear = (elementId, defaultText) => {
-            const el = document.getElementById(elementId);
-            if (!el) return;
-            
-            el.addEventListener('focus', function() {
-                if (this.innerText.trim() === defaultText) {
-                    this.innerText = '';
-                }
-            });
-            
-            el.addEventListener('blur', function() {
-                if (this.innerText.trim() === '') {
-                    this.innerText = defaultText;
-                }
-            });
-        };
-
-        setupAutoClear('customer-name', 'Customer Name');
-        setupAutoClear('customer-phone', 'Phone Number');
-
-        // --- 7. Memory Functions (Save/Search/New) ---
-
-        function saveInvoice() {
-            const invoiceNum = invoiceNumberElement.textContent;
-            const customerName = document.getElementById('customer-name').innerText;
-            const customerPhone = document.getElementById('customer-phone').innerText;
-            const date = document.getElementById('invoice-date').innerText;
-            const paid = document.getElementById('paid-toggle').checked;
-
-            // Gather items
-            const items = [];
-            document.querySelectorAll('.item-row').forEach(row => {
-                const desc = row.querySelector('.item-desc').innerText;
-                const amount = row.querySelector('.item-amount').innerText;
-                items.push({ desc, amount });
-            });
-
-            const invoiceData = {
-                id: invoiceNum,
-                customerName,
-                customerPhone,
-                date,
-                items,
-                paid
-            };
-
-            // Save specific invoice data
-            localStorage.setItem(STORAGE_PREFIX + parseInt(invoiceNum, 10), JSON.stringify(invoiceData));
-            
-            // Show feedback
-            const msg = document.getElementById('search-message');
-            msg.textContent = `Invoice #${invoiceNum} Saved Successfully! / تم الحفظ بنجاح`;
-            msg.className = "text-xs mt-2 font-bold text-green-600";
-            setTimeout(() => msg.textContent = "", 3000);
+        function initializeInvoiceNumber() {
+            let num = localStorage.getItem(KEYS.INVOICE_CTR);
+            if (!num) { num = 1000; localStorage.setItem(KEYS.INVOICE_CTR, num); }
+            invoiceNumberElement.textContent = String(parseInt(num)+1).padStart(6, '0');
         }
 
+        function saveInvoice() {
+            const num = invoiceNumberElement.textContent;
+            const data = {
+                id: num,
+                customerName: document.getElementById('customer-name').innerText,
+                customerPhone: document.getElementById('customer-phone').innerText,
+                date: dateElement.innerText,
+                items: Array.from(document.querySelectorAll('.item-row')).map(r => ({
+                    desc: r.querySelector('.item-desc').innerText,
+                    amount: r.querySelector('.item-amount').innerText
+                })),
+                paid: document.getElementById('paid-toggle').checked
+            };
+            localStorage.setItem(KEYS.INVOICE_PREFIX + parseInt(num), JSON.stringify(data));
+            showMessage(`Invoice #${num} Saved!`);
+        }
+        
         function searchInvoice() {
-            const searchInput = document.getElementById('search-input');
-            const searchVal = searchInput.value;
-            const msg = document.getElementById('search-message');
-
-            if (!searchVal) {
-                msg.textContent = "Please enter a number / الرجاء إدخال رقم";
-                msg.className = "text-xs mt-2 font-bold text-red-500";
-                return;
-            }
-
-            const dataString = localStorage.getItem(STORAGE_PREFIX + parseInt(searchVal, 10));
+            const val = document.getElementById('search-input').value;
+            if(!val) return;
+            const data = JSON.parse(localStorage.getItem(KEYS.INVOICE_PREFIX + parseInt(val)));
             
-            if (dataString) {
-                const data = JSON.parse(dataString);
-                
-                // Populate fields
+            if(data) {
                 invoiceNumberElement.textContent = String(data.id).padStart(6, '0');
                 document.getElementById('customer-name').innerText = data.customerName;
-                document.getElementById('customer-phone').innerText = data.customerPhone;
-                document.getElementById('invoice-date').innerText = data.date;
-                
-                // Paid status
-                document.getElementById('paid-toggle').checked = data.paid || false;
-                watermark.style.display = data.paid ? 'block' : 'none';
-
-                // Rebuild items
-                itemsTableBody.innerHTML = ''; // Clear current
-                if (data.items && data.items.length > 0) {
-                    data.items.forEach(item => {
-                        addRow(item.desc, item.amount);
-                    });
-                } else {
-                    addRow(); // Default empty row if none found
-                }
-                
+                document.getElementById('customer-phone').innerText = data.customerPhone || "";
+                dateElement.innerText = data.date;
+                document.getElementById('paid-toggle').checked = data.paid;
+                document.getElementById('paid-watermark').style.display = data.paid ? 'block' : 'none';
+                itemsTableBody.innerHTML = '';
+                (data.items || []).forEach(i => addRow(i.desc, i.amount));
                 calculateTotal();
-
-                msg.textContent = `Invoice #${searchVal} Loaded / تم التحميل`;
-                msg.className = "text-xs mt-2 font-bold text-blue-600";
+                showMessage(`Invoice #${val} Loaded`, 'blue');
             } else {
-                msg.textContent = `Invoice #${searchVal} Not Found / غير موجود`;
-                msg.className = "text-xs mt-2 font-bold text-red-500";
+                showMessage(`Invoice #${val} Not Found`, 'red');
             }
         }
 
         function generateNewInvoice() {
-            // Get current highest number from storage to ensure we step forward
-            let lastInvoiceNumber = localStorage.getItem(STORAGE_KEY_COUNTER);
-            if (!lastInvoiceNumber) lastInvoiceNumber = 1000;
-            
-            // Increment
-            const nextNum = parseInt(lastInvoiceNumber, 10) + 1;
-            
-            // Save new counter
-            localStorage.setItem(STORAGE_KEY_COUNTER, nextNum);
-            
-            // Update Display
-            setInvoiceNumberDisplay(nextNum);
-            setTodayDate();
-            
-            // Reset Fields
-            document.getElementById('customer-name').innerText = 'Customer Name';
-            document.getElementById('customer-phone').innerText = 'Phone Number';
-            document.getElementById('paid-toggle').checked = false;
-            watermark.style.display = 'none';
-            document.getElementById('search-message').textContent = "";
-            document.getElementById('search-input').value = "";
-            
-            // Reset Table
+            let last = parseInt(localStorage.getItem(KEYS.INVOICE_CTR) || 1000);
+            const next = last + 1;
+            localStorage.setItem(KEYS.INVOICE_CTR, next);
+            invoiceNumberElement.textContent = String(next).padStart(6, '0');
             itemsTableBody.innerHTML = '';
             addRow();
             calculateTotal();
+            document.getElementById('customer-name').innerText = "Customer Name";
+            document.getElementById('customer-phone').innerText = "Phone Number";
+            document.getElementById('paid-toggle').checked = false;
+            document.getElementById('paid-watermark').style.display = 'none';
         }
 
-        // --- 8. Data Management (Backup/Restore) ---
-        function backupData() {
+        // ==========================================
+        //  TAB 2: MONTHLY HISAB LOGIC
+        // ==========================================
+        function getDailyEntries() {
+            return JSON.parse(localStorage.getItem(KEYS.DAILY) || '[]');
+        }
+
+        function addDailyEntry(type) {
+            const date = document.getElementById('daily-date').value;
+            const desc = document.getElementById('daily-desc').value;
+            const amount = parseFloat(document.getElementById('daily-amount').value);
+
+            if (!date || !desc || isNaN(amount)) {
+                alert("Please fill all fields");
+                return;
+            }
+
+            const entries = getDailyEntries();
+            entries.push({
+                id: Date.now(),
+                date,
+                desc,
+                amount,
+                type // 'income' or 'expense'
+            });
+            localStorage.setItem(KEYS.DAILY, JSON.stringify(entries));
+            
+            document.getElementById('daily-desc').value = '';
+            document.getElementById('daily-amount').value = '';
+            renderMonthlyHisab();
+        }
+
+        function deleteDailyEntry(id) {
+            if(!confirm("Delete this entry?")) return;
+            let entries = getDailyEntries();
+            entries = entries.filter(e => e.id !== id);
+            localStorage.setItem(KEYS.DAILY, JSON.stringify(entries));
+            renderMonthlyHisab();
+        }
+
+        function renderMonthlyHisab() {
+            const listBody = document.getElementById('daily-list-body');
+            const entries = getDailyEntries();
+            
+            // --- UPDATED LOGIC: FILTER BY MONTH ---
+            const monthVal = document.getElementById('hisab-month-filter').value; // YYYY-MM
+            
+            // Filter entries that start with YYYY-MM
+            const filteredEntries = entries.filter(e => e.date.startsWith(monthVal));
+            
+            // Sort by date (descending - newest first)
+            filteredEntries.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+            listBody.innerHTML = '';
+            let totalInc = 0;
+            let totalExp = 0;
+
+            filteredEntries.forEach(e => {
+                if(e.type === 'income') totalInc += e.amount;
+                else totalExp += e.amount;
+
+                const tr = document.createElement('tr');
+                tr.className = 'border-b hover:bg-gray-50';
+                // Show Date + Time
+                const dateObj = new Date(e.date);
+                const day = String(dateObj.getDate()).padStart(2,'0');
+                const timeStr = new Date(e.id).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                tr.innerHTML = `
+                    <td class="p-3 text-gray-600 text-xs">
+                        <span class="font-bold text-gray-800">${day}</span> ${timeStr}
+                    </td>
+                    <td class="p-3 font-medium text-gray-800">${e.desc}</td>
+                    <td class="p-3 text-right text-green-600 font-mono">${e.type === 'income' ? e.amount.toFixed(3) : '-'}</td>
+                    <td class="p-3 text-right text-red-600 font-mono">${e.type === 'expense' ? e.amount.toFixed(3) : '-'}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="deleteDailyEntry(${e.id})" class="text-gray-400 hover:text-red-500">&times;</button>
+                    </td>
+                `;
+                listBody.appendChild(tr);
+            });
+
+            document.getElementById('daily-total-income').textContent = totalInc.toFixed(3);
+            document.getElementById('daily-total-expense').textContent = totalExp.toFixed(3);
+            const net = totalInc - totalExp;
+            const netEl = document.getElementById('daily-net-balance');
+            netEl.textContent = net.toFixed(3);
+            netEl.className = `text-xl font-bold mt-1 ${net >= 0 ? 'text-blue-800' : 'text-red-800'}`;
+            
+            document.getElementById('daily-empty-msg').style.display = filteredEntries.length === 0 ? 'block' : 'none';
+        }
+
+        // Refresh list when Month Filter changes
+        document.getElementById('hisab-month-filter').addEventListener('change', renderMonthlyHisab);
+
+
+        // ==========================================
+        //  TAB 3: WHOLESALE HISAB LOGIC
+        // ==========================================
+        let currentWsCustomerId = null;
+
+        function getWsCustomers() {
+            return JSON.parse(localStorage.getItem(KEYS.WS_CUSTOMERS) || '[]');
+        }
+
+        function addWsCustomer() {
+            const name = document.getElementById('new-customer-name').value;
+            const phone = document.getElementById('new-customer-phone').value;
+            if(!name) return alert("Enter name");
+
+            const customers = getWsCustomers();
+            const newId = 'cus_' + Date.now();
+            customers.push({ id: newId, name, phone });
+            localStorage.setItem(KEYS.WS_CUSTOMERS, JSON.stringify(customers));
+            
+            document.getElementById('new-customer-name').value = '';
+            document.getElementById('new-customer-phone').value = '';
+            renderWsCustomers();
+        }
+
+        function renderWsCustomers() {
+            const grid = document.getElementById('ws-customers-grid');
+            const customers = getWsCustomers();
+            grid.innerHTML = '';
+
+            customers.forEach(c => {
+                const trans = JSON.parse(localStorage.getItem(KEYS.WS_TRANS + c.id) || '[]');
+                const due = trans.reduce((acc, t) => acc + (t.type === 'buy' ? t.amount : -t.amount), 0);
+
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-gray-200 p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer flex justify-between items-center';
+                card.onclick = () => openWsCustomer(c);
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                            ${c.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">${c.name}</h3>
+                            <p class="text-xs text-gray-500">${c.phone || ''}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-400 uppercase">Due</span>
+                        <p class="font-bold ${due > 0 ? 'text-red-600' : 'text-green-600'}">${due.toFixed(3)}</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openWsCustomer(customer) {
+            currentWsCustomerId = customer.id;
+            document.getElementById('ws-customer-list-view').classList.add('hidden');
+            document.getElementById('ws-customer-detail-view').classList.remove('hidden');
+            
+            document.getElementById('ws-detail-name').textContent = customer.name;
+            document.getElementById('ws-detail-phone').textContent = customer.phone || 'No Phone';
+            renderWsTransactions();
+        }
+
+        function showWsCustomerList() {
+            document.getElementById('ws-customer-list-view').classList.remove('hidden');
+            document.getElementById('ws-customer-detail-view').classList.add('hidden');
+            currentWsCustomerId = null;
+            renderWsCustomers();
+        }
+
+        function addWsTransaction(type) {
+            if(!currentWsCustomerId) return;
+            const date = document.getElementById('ws-trans-date').value;
+            const remark = document.getElementById('ws-trans-remark').value;
+            const amount = parseFloat(document.getElementById('ws-trans-amount').value);
+
+            if(!date || !remark || isNaN(amount)) return alert("Fill all fields");
+
+            const key = KEYS.WS_TRANS + currentWsCustomerId;
+            const trans = JSON.parse(localStorage.getItem(key) || '[]');
+            
+            trans.push({
+                id: Date.now(),
+                date,
+                remark,
+                amount,
+                type 
+            });
+            
+            localStorage.setItem(key, JSON.stringify(trans));
+            
+            document.getElementById('ws-trans-remark').value = '';
+            document.getElementById('ws-trans-amount').value = '';
+            renderWsTransactions();
+        }
+
+        function renderWsTransactions() {
+            if(!currentWsCustomerId) return;
+            const trans = JSON.parse(localStorage.getItem(KEYS.WS_TRANS + currentWsCustomerId) || '[]');
+            const tbody = document.getElementById('ws-trans-body');
+            tbody.innerHTML = '';
+            
+            let runningBalance = 0;
+            trans.sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
+
+            trans.forEach(t => {
+                if(t.type === 'buy') runningBalance += t.amount;
+                else runningBalance -= t.amount;
+
+                const tr = document.createElement('tr');
+                tr.className = 'border-b hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="p-3 text-gray-600 font-mono text-xs whitespace-nowrap">${t.date}</td>
+                    <td class="p-3 font-medium text-gray-800">${t.remark}</td>
+                    <td class="p-3 text-right text-red-600 font-mono">${t.type === 'buy' ? t.amount.toFixed(3) : '-'}</td>
+                    <td class="p-3 text-right text-green-600 font-mono">${t.type === 'pay' ? t.amount.toFixed(3) : '-'}</td>
+                    <td class="p-3 text-right font-bold font-mono ${runningBalance > 0 ? 'text-red-700' : 'text-green-700'}">${runningBalance.toFixed(3)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('ws-detail-due').textContent = runningBalance.toFixed(3);
+            document.getElementById('ws-empty-state').classList.toggle('hidden', trans.length > 0);
+        }
+
+        // ==========================================
+        //  UTILITIES
+        // ==========================================
+        function showMessage(text, color='green') {
+            const msg = document.getElementById('search-message');
+            msg.textContent = text;
+            msg.className = `text-xs mt-2 font-bold text-${color}-600`;
+            setTimeout(() => msg.textContent = "", 3000);
+        }
+
+        document.getElementById('paid-toggle').addEventListener('change', (e) => {
+            document.getElementById('paid-watermark').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        window.backupData = function() {
             const data = {};
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key.startsWith(STORAGE_PREFIX) || key === STORAGE_KEY_COUNTER) {
+                if (key.startsWith('zobayer')) {
                     data[key] = localStorage.getItem(key);
                 }
             }
@@ -571,29 +1036,31 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `zobayer_kummah_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `zobayer_shop_backup_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
-            URL.revokeObjectURL(url);
-        }
+        };
 
-        function restoreData(input) {
+        window.restoreData = function(input) {
             const file = input.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    Object.keys(data).forEach(key => {
-                        localStorage.setItem(key, data[key]);
-                    });
-                    alert('Data Restored Successfully! / تم استعادة البيانات بنجاح');
+                    Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
+                    alert('Data Restored!');
                     location.reload();
-                } catch (err) {
-                    alert('Error reading file / خطأ في قراءة الملف');
-                }
+                } catch (err) { alert('Error reading file'); }
             };
             reader.readAsText(file);
-        }
+        };
+
+        // INITIAL STARTUP
+        initializeInvoiceNumber();
+        setTodayDate();
+        renderMonthlyHisab(); // Now the default view
+        addRow(); // Initial invoice row
+        calculateTotal();
 
     </script>
 </body>
