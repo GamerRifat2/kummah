@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zobayer Kummah Shop Manager</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Zobayer Shop">
+    <link rel="apple-touch-icon" href="logo.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons for better UI -->
@@ -111,7 +120,7 @@
     <!-- GLOBAL APP HEADER (NEW) -->
     <header class="bg-white border-b border-gray-200 pt-4 pb-2 no-print">
         <div class="max-w-[850px] mx-auto flex flex-col items-center justify-center">
-            <img src="logo.png" alt="Zobayer Kummah Shop" class="h-16 w-auto mb-2 object-contain">
+            <img src="logo.png" alt="Zobayer Kummah Shop" class="h-16 w-auto mb-2 object-contain" onerror="this.style.display='none'">
             <h1 class="text-xl font-bold text-gray-800 uppercase tracking-wider">Zobayer Kummah Shop Manager</h1>
         </div>
     </header>
@@ -426,7 +435,7 @@
                 </div>
                 <div class="text-center w-full md:w-1/3 print:w-1/3 order-1 md:order-2 flex justify-center">
                     <!-- Placeholder Logo -->
-                    <img src="logo.png" alt="Shop Logo" class="h-32 w-auto object-contain">
+                    <img src="logo.png" alt="Shop Logo" class="h-32 w-auto object-contain" onerror="this.style.display='none'">
                 </div>
                 <div class="text-center md:text-right print:text-right w-full md:w-1/3 print:w-1/3 order-3 md:order-3 pt-2 arabic-text">
                     <h1 contenteditable="true" class="editable font-bold text-gray-800 text-xl leading-tight mb-1">محل زبير للكمة</h1>
@@ -661,6 +670,18 @@
             WS_CUSTOMERS: 'zobayer_ws_customers',
             WS_TRANS: 'zobayer_ws_trans_' // + customerId
         };
+
+        // --- PWA SERVICE WORKER REGISTRATION ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    }, err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
 
         // --- TABS LOGIC ---
         function switchTab(tabName) {
@@ -1093,9 +1114,12 @@
                     <td class="p-2 text-right font-mono ${e.type === 'income' ? 'text-green-600' : 'text-red-600'}">
                         ${e.type === 'income' ? '+' : '-'}${e.amount.toFixed(3)}
                     </td>
-                    <td class="p-2 text-center">
+                    <td class="p-2 text-center flex justify-center gap-2">
                         <button onclick="recoverDailyEntry(${e.id})" class="text-blue-500 hover:text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 rounded">
                             Recover
+                        </button>
+                        <button onclick="permanentlyDeleteDailyEntry(${e.id})" class="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-2 py-1 rounded" title="Delete Forever">
+                            Delete
                         </button>
                     </td>
                 `;
@@ -1125,6 +1149,15 @@
                 renderDeletedHistory();
                 renderMonthlyHisab(); // Update background view too
             }
+        }
+
+        function permanentlyDeleteDailyEntry(id) {
+            if(!confirm("Permanently delete this entry? This cannot be undone.")) return;
+            
+            let deleted = getDeletedEntries();
+            deleted = deleted.filter(e => e.id !== id);
+            localStorage.setItem(KEYS.DAILY_DELETED, JSON.stringify(deleted));
+            renderDeletedHistory();
         }
 
         document.getElementById('hisab-month-filter').addEventListener('change', renderMonthlyHisab);
