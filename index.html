@@ -79,13 +79,24 @@
         /* Hidden Statement Containers by default */
         #statement-print-area, #monthly-print-area { display: none; }
 
+        /* Login Modal Styles */
+        #login-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: #f3f4f6;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         /* Print Styles */
         @media print {
             @page { size: A4; margin: 0.5cm; }
             body { margin: 0; padding: 0; background-color: white; -webkit-print-color-adjust: exact; zoom: 0.95; }
             
             /* GLOBAL HIDES */
-            .no-print, nav, .controls, #daily-tab, #wholesale-tab, button, #deleted-history-modal { display: none !important; }
+            .no-print, nav, .controls, #daily-tab, #wholesale-tab, button, #deleted-history-modal, #ws-deleted-history-modal, #login-overlay { display: none !important; }
             
             /* PRINT MODE: INVOICE */
             body.print-mode-invoice #invoice-tab { display: block !important; }
@@ -116,6 +127,28 @@
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen pb-12">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="login-overlay">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center border border-gray-100">
+            <!-- Increased logo size to h-32 -->
+            <img src="logo.png" alt="Zobayer Kummah Shop" class="h-32 w-auto mx-auto mb-6 object-contain" onerror="this.style.display='none'">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+            <p class="text-gray-500 mb-6 text-sm">Please enter access code to continue</p>
+            
+            <input type="password" id="login-password" 
+                   class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-lg tracking-widest transition-all" 
+                   placeholder="Enter Password"
+                   onkeyup="if(event.key === 'Enter') checkLogin()">
+            
+            <button onclick="checkLogin()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">
+                Login
+            </button>
+            <p id="login-error" class="text-red-500 text-sm mt-4 hidden font-medium flex items-center justify-center gap-1">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i> Incorrect Password
+            </p>
+        </div>
+    </div>
 
     <!-- GLOBAL APP HEADER (NEW) -->
     <header class="bg-white border-b border-gray-200 pt-4 pb-2 no-print">
@@ -239,12 +272,12 @@
         </div>
     </div>
 
-    <!-- DELETED HISTORY MODAL -->
+    <!-- DAILY DELETED HISTORY MODAL -->
     <div id="deleted-history-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2">
-                    <i data-lucide="trash-2" class="text-red-500"></i> Deleted History
+                    <i data-lucide="trash-2" class="text-red-500"></i> Monthly Hisab Deleted History
                 </h3>
                 <button onclick="closeDeletedHistory()" class="text-gray-500 hover:text-gray-700">&times;</button>
             </div>
@@ -266,6 +299,38 @@
             </div>
             <div class="p-4 border-t bg-gray-50 text-right rounded-b-lg">
                 <button onclick="closeDeletedHistory()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm font-bold">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WHOLESALE DELETED HISTORY MODAL (NEW) -->
+    <div id="ws-deleted-history-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                    <i data-lucide="trash-2" class="text-red-500"></i> Wholesale Deleted History
+                </h3>
+                <button onclick="closeWsDeletedHistory()" class="text-gray-500 hover:text-gray-700">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-grow">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 border-b">
+                            <th class="p-2">Date</th>
+                            <th class="p-2">Remark</th>
+                            <th class="p-2 text-right">Amount</th>
+                            <th class="p-2 text-right">Type</th>
+                            <th class="p-2 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ws-deleted-history-body">
+                        <!-- Deleted items -->
+                    </tbody>
+                </table>
+                <div id="ws-deleted-empty-msg" class="text-center py-8 text-gray-400 text-xs hidden">No deleted items found.</div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 text-right rounded-b-lg">
+                <button onclick="closeWsDeletedHistory()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm font-bold">Close</button>
             </div>
         </div>
     </div>
@@ -300,6 +365,11 @@
                 <!-- PRINT CONTROLS -->
                 <div class="flex flex-col items-end gap-2 bg-gray-100 p-3 rounded-lg self-end">
                     <div class="flex items-center gap-2">
+                        <!-- DELETED HISTORY BUTTON -->
+                        <button onclick="openWsDeletedHistory()" class="text-gray-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors mr-2" title="Deleted History">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+
                         <div class="flex flex-col">
                             <label class="text-[10px] text-gray-500 font-bold uppercase">From</label>
                             <input type="date" id="print-start-date" class="text-xs p-1 border rounded w-28">
@@ -369,7 +439,8 @@
                             <th class="p-3">Remark</th>
                             <th class="p-3 text-right">Purchase (+)</th>
                             <th class="p-3 text-right">Payment (-)</th>
-                             <th class="p-3 text-right rounded-tr-lg">Balance</th>
+                             <th class="p-3 text-right">Balance</th>
+                             <th class="p-3 text-center rounded-tr-lg">Action</th>
                         </tr>
                     </thead>
                     <tbody id="ws-trans-body">
@@ -668,8 +739,32 @@
             DAILY: 'zobayer_daily_entries',
             DAILY_DELETED: 'zobayer_daily_deleted', // New key for recycle bin
             WS_CUSTOMERS: 'zobayer_ws_customers',
-            WS_TRANS: 'zobayer_ws_trans_' // + customerId
+            WS_TRANS: 'zobayer_ws_trans_', // + customerId
+            WS_TRANS_DELETED: 'zobayer_ws_trans_del_', // + customerId (NEW)
+            AUTH: 'zobayer_app_auth'
         };
+
+        // --- AUTH LOGIC (ONE-TIME LOGIN) ---
+        function checkLogin() {
+            const pass = document.getElementById('login-password').value;
+            const errorMsg = document.getElementById('login-error');
+            
+            if (pass === 'E19') {
+                localStorage.setItem(KEYS.AUTH, 'true');
+                document.getElementById('login-overlay').style.display = 'none';
+                errorMsg.classList.add('hidden');
+            } else {
+                errorMsg.classList.remove('hidden');
+                // Shake effect logic could go here
+            }
+        }
+
+        // Check auth on load
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem(KEYS.AUTH) === 'true') {
+                document.getElementById('login-overlay').style.display = 'none';
+            }
+        });
 
         // --- PWA SERVICE WORKER REGISTRATION ---
         if ('serviceWorker' in navigator) {
@@ -1241,7 +1336,7 @@
             const remark = document.getElementById('ws-trans-remark').value;
             const amount = parseFloat(document.getElementById('ws-trans-amount').value);
 
-            if(!date || !remark || isNaN(amount)) return alert("Fill all fields");
+            if(!date || isNaN(amount)) return alert("Fill date and amount"); // Removed remark check
 
             const key = KEYS.WS_TRANS + currentWsCustomerId;
             const trans = JSON.parse(localStorage.getItem(key) || '[]');
@@ -1259,6 +1354,100 @@
             document.getElementById('ws-trans-remark').value = '';
             document.getElementById('ws-trans-amount').value = '';
             renderWsTransactions();
+        }
+
+        // --- WHOLESALE DELETED HISTORY & RECOVERY ---
+        function deleteWsTransaction(id) {
+            if(!confirm("Move to deleted history?")) return;
+            if(!currentWsCustomerId) return;
+
+            const key = KEYS.WS_TRANS + currentWsCustomerId;
+            const delKey = KEYS.WS_TRANS_DELETED + currentWsCustomerId;
+            
+            const trans = JSON.parse(localStorage.getItem(key) || '[]');
+            const deleted = JSON.parse(localStorage.getItem(delKey) || '[]');
+
+            const index = trans.findIndex(t => t.id === id);
+            if(index > -1) {
+                deleted.push(trans[index]);
+                trans.splice(index, 1);
+                
+                localStorage.setItem(key, JSON.stringify(trans));
+                localStorage.setItem(delKey, JSON.stringify(deleted));
+                renderWsTransactions();
+            }
+        }
+
+        function openWsDeletedHistory() {
+            if(!currentWsCustomerId) return;
+            document.getElementById('ws-deleted-history-modal').classList.remove('hidden');
+            renderWsDeletedHistory();
+        }
+
+        function closeWsDeletedHistory() {
+            document.getElementById('ws-deleted-history-modal').classList.add('hidden');
+        }
+
+        function renderWsDeletedHistory() {
+            if(!currentWsCustomerId) return;
+            const delKey = KEYS.WS_TRANS_DELETED + currentWsCustomerId;
+            const deleted = JSON.parse(localStorage.getItem(delKey) || '[]');
+            const tbody = document.getElementById('ws-deleted-history-body');
+            
+            deleted.sort((a,b) => b.id - a.id); // Newest first
+            tbody.innerHTML = '';
+
+            deleted.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="p-2 text-gray-600 text-xs">${t.date}</td>
+                    <td class="p-2 text-gray-800">${t.remark || '-'}</td>
+                    <td class="p-2 text-right font-mono">${t.amount.toFixed(3)}</td>
+                    <td class="p-2 text-right text-xs uppercase font-bold ${t.type === 'buy' ? 'text-red-600' : 'text-green-600'}">${t.type}</td>
+                    <td class="p-2 text-center flex justify-center gap-2">
+                        <button onclick="recoverWsTransaction(${t.id})" class="text-blue-500 hover:text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 rounded">Recover</button>
+                        <button onclick="permanentlyDeleteWsTransaction(${t.id})" class="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-2 py-1 rounded">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('ws-deleted-empty-msg').style.display = deleted.length === 0 ? 'block' : 'none';
+        }
+
+        function recoverWsTransaction(id) {
+            if(!confirm("Recover this transaction?")) return;
+            if(!currentWsCustomerId) return;
+
+            const key = KEYS.WS_TRANS + currentWsCustomerId;
+            const delKey = KEYS.WS_TRANS_DELETED + currentWsCustomerId;
+            
+            const trans = JSON.parse(localStorage.getItem(key) || '[]');
+            const deleted = JSON.parse(localStorage.getItem(delKey) || '[]');
+
+            const index = deleted.findIndex(t => t.id === id);
+            if(index > -1) {
+                trans.push(deleted[index]);
+                deleted.splice(index, 1);
+                
+                localStorage.setItem(key, JSON.stringify(trans));
+                localStorage.setItem(delKey, JSON.stringify(deleted));
+                
+                renderWsDeletedHistory();
+                renderWsTransactions();
+            }
+        }
+
+        function permanentlyDeleteWsTransaction(id) {
+            if(!confirm("Permanently delete this transaction? This cannot be undone.")) return;
+            if(!currentWsCustomerId) return;
+
+            const delKey = KEYS.WS_TRANS_DELETED + currentWsCustomerId;
+            let deleted = JSON.parse(localStorage.getItem(delKey) || '[]');
+            
+            deleted = deleted.filter(t => t.id !== id);
+            localStorage.setItem(delKey, JSON.stringify(deleted));
+            renderWsDeletedHistory();
         }
 
         function renderWsTransactions() {
@@ -1282,9 +1471,15 @@
                     <td class="p-3 text-right text-red-600 font-mono">${t.type === 'buy' ? t.amount.toFixed(3) : '-'}</td>
                     <td class="p-3 text-right text-green-600 font-mono">${t.type === 'pay' ? t.amount.toFixed(3) : '-'}</td>
                     <td class="p-3 text-right font-bold font-mono ${runningBalance > 0 ? 'text-red-700' : 'text-green-700'}">${runningBalance.toFixed(3)}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="deleteWsTransaction(${t.id})" class="text-gray-400 hover:text-red-500" title="Delete">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+            lucide.createIcons();
 
             document.getElementById('ws-detail-due').textContent = runningBalance.toFixed(3);
             document.getElementById('ws-empty-state').classList.toggle('hidden', trans.length > 0);
