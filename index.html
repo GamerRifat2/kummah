@@ -344,10 +344,11 @@
                 <i data-lucide="users" class="text-indigo-600"></i> Wholesale Customers
             </h2>
 
-            <div class="flex gap-2 mb-6">
-                <input type="text" id="new-customer-name" placeholder="New Customer Name / اسم العميل" class="flex-grow p-2 border border-gray-300 rounded">
-                 <input type="text" id="new-customer-phone" placeholder="Phone" class="w-1/3 p-2 border border-gray-300 rounded">
-                <button onclick="addWsCustomer()" class="bg-indigo-600 text-white px-4 rounded hover:bg-indigo-700 font-medium">Add</button>
+            <div class="flex flex-col md:flex-row gap-2 mb-6">
+                <input type="text" id="new-customer-name" placeholder="Name / اسم العميل" class="flex-grow p-2 border border-gray-300 rounded">
+                <input type="text" id="new-customer-phone" placeholder="Phone / هاتف" class="md:w-1/4 p-2 border border-gray-300 rounded">
+                <input type="number" id="new-customer-due" placeholder="Prev Due (Optional)" step="0.001" class="md:w-1/6 p-2 border border-gray-300 rounded font-mono">
+                <button onclick="addWsCustomer()" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 font-medium">Add</button>
             </div>
 
             <div class="grid grid-cols-1 gap-4" id="ws-customers-grid">
@@ -1270,6 +1271,8 @@
         function addWsCustomer() {
             const name = document.getElementById('new-customer-name').value;
             const phone = document.getElementById('new-customer-phone').value;
+            const prevDue = parseFloat(document.getElementById('new-customer-due').value);
+            
             if(!name) return alert("Enter name");
 
             const customers = getWsCustomers();
@@ -1277,8 +1280,26 @@
             customers.push({ id: newId, name, phone });
             localStorage.setItem(KEYS.WS_CUSTOMERS, JSON.stringify(customers));
             
+            // Handle Previous Due
+            if (!isNaN(prevDue) && prevDue > 0) {
+                const key = KEYS.WS_TRANS + newId;
+                const trans = [];
+                // Use today's date
+                const dateVal = document.getElementById('daily-date').value || new Date().toISOString().split('T')[0];
+                
+                trans.push({
+                    id: Date.now(),
+                    date: dateVal,
+                    remark: "Previous Due / الرصيد السابق",
+                    amount: prevDue,
+                    type: 'buy' // Buy increases due amount
+                });
+                localStorage.setItem(key, JSON.stringify(trans));
+            }
+
             document.getElementById('new-customer-name').value = '';
             document.getElementById('new-customer-phone').value = '';
+            document.getElementById('new-customer-due').value = ''; // Clear new field
             renderWsCustomers();
         }
 
